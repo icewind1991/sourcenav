@@ -20,3 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 ```
+
+## Credits and Licence
+
+This library is largely based on [gonav](https://github.com/mrazza/gonav), a parser for `.nav` files written in Go
+and is licenced under AGPL-3.0.
