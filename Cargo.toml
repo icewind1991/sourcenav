@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 bitbuffer = "0.7.1"
 err-derive = "0.2.4"
+aabb-quadtree = "0.2.0"
+euclid = "0.19"

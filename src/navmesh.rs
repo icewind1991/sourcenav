@@ -1,4 +1,6 @@
+use aabb_quadtree::Spatial;
 use bitbuffer::{BitRead, BitReadStream, Endianness, ReadError};
+use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
 use std::ops::Index;
 
 #[derive(Debug, BitRead)]
@@ -23,6 +25,44 @@ pub struct NavArea {
     pub earliest_occupy_second_team: f32,
     pub visible_areas: Vec<VisibleArea>,
     pub inherit_visibility_from_area_id: u32,
+}
+
+impl NavArea {
+    pub fn width(&self) -> f32 {
+        self.south_east.0 - self.north_west.0
+    }
+    pub fn height(&self) -> f32 {
+        self.south_east.1 - self.north_west.1
+    }
+
+    pub fn get_z_height(&self, x: f32, y: f32) -> f32 {
+        let from_east = self.south_east.0 - x;
+        let from_south = self.south_east.0 - y;
+
+        let north_slope = (self.north_west.2 - self.north_east_z) / self.width();
+        let south_slope = (self.south_west_z - self.south_east.2) / self.width();
+
+        let north_z = self.north_east_z + north_slope * from_east;
+        let south_z = self.south_east.2 + south_slope * from_east;
+
+        let final_slope = (north_z - south_z) / self.height();
+
+        south_z + final_slope * from_south
+    }
+}
+
+pub struct HammerUnit;
+
+impl Spatial<HammerUnit> for NavArea {
+    fn aabb(&self) -> TypedRect<f32, HammerUnit> {
+        TypedRect {
+            origin: TypedPoint2D::new(self.north_west.0, self.north_west.1),
+            size: TypedSize2D::new(
+                self.south_east.0 - self.north_west.0,
+                self.south_east.1 - self.north_west.1,
+            ),
+        }
+    }
 }
 
 #[derive(Debug)]
