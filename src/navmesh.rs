@@ -3,12 +3,18 @@ use bitbuffer::{BitRead, BitReadStream, Endianness, ReadError};
 use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
 use std::ops::Index;
 
+/// A 3 dimensional coordinate
 #[derive(Debug, BitRead)]
 pub struct Vector3(pub f32, pub f32, pub f32);
 
+/// A unique identifier for a navigation area
+#[derive(Debug, BitRead, Clone, Copy, Eq, PartialEq)]
+pub struct NavAreaId(u32);
+
+/// A navigation area from the nav file
 #[derive(Debug)]
 pub struct NavArea {
-    pub id: u32,
+    pub id: NavAreaId,
     pub north_west: Vector3,
     pub south_east: Vector3,
     pub north_east_z: f32,
@@ -35,6 +41,22 @@ impl NavArea {
         self.south_east.1 - self.north_west.1
     }
 
+    /// Get the z height of a x/y point inside the navigation area
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use sourcenav::get_area_tree;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///   let file = std::fs::read("path/to/navfile.nav")?;
+    ///   let tree = get_area_tree(file)?;
+    ///   let area = tree.query(150.0, -312.0).next().unwrap();
+    ///   
+    ///   let height = area.get_z_height(150.0, -312.0);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn get_z_height(&self, x: f32, y: f32) -> f32 {
         let from_east = self.south_east.0 - x;
         let from_south = self.south_east.0 - y;
@@ -51,7 +73,7 @@ impl NavArea {
     }
 }
 
-pub struct HammerUnit;
+pub(crate) struct HammerUnit;
 
 impl Spatial<HammerUnit> for NavArea {
     fn aabb(&self) -> TypedRect<f32, HammerUnit> {
@@ -65,8 +87,26 @@ impl Spatial<HammerUnit> for NavArea {
     }
 }
 
-#[derive(Debug)]
-pub struct Connections([Vec<u32>; 4]);
+/// The connections from a navigation area into it's neighbours
+///
+/// Contains a list of area id's for every [`NavDirection`]
+///
+/// # Examples
+///
+/// ```no_run
+/// # fn get_connections_from_somewhere() -> sourcenav::Connections {
+/// #    Default::default()
+/// # }
+/// use sourcenav::NavDirection;
+///
+/// let connections = get_connections_from_somewhere();
+///
+/// let north_connections = &connections[NavDirection::North];
+/// ```
+///
+/// [`NavDirection`]: ./enum.NavDirection.html
+#[derive(Debug, Default)]
+pub struct Connections([Vec<NavAreaId>; 4]);
 
 impl<E: Endianness> BitRead<E> for Connections {
     fn read(stream: &mut BitReadStream<E>) -> Result<Self, ReadError> {
@@ -85,15 +125,33 @@ impl<E: Endianness> BitRead<E> for Connections {
 }
 
 impl Index<NavDirection> for Connections {
-    type Output = Vec<u32>;
+    type Output = Vec<NavAreaId>;
 
     fn index(&self, index: NavDirection) -> &Self::Output {
         &self.0[index as u8 as usize]
     }
 }
 
-#[derive(Debug)]
-pub struct LadderConnections([Vec<u32>; 2]);
+/// The connections from a navigation area into it's neighbours
+///
+/// Contains a list of area id's for every [`NavDirection`]
+///
+/// # Examples
+///
+/// ```no_run
+/// # fn get_ladder_connections_from_somewhere() -> sourcenav::LadderConnections {
+/// #    Default::default()
+/// # }
+/// use sourcenav::LadderDirection;
+///
+/// let connections = get_ladder_connections_from_somewhere();
+///
+/// let down_connections = &connections[LadderDirection::Down];
+/// ```
+///
+/// [`NavDirection`]: ./enum.NavDirection.html
+#[derive(Debug, Default)]
+pub struct LadderConnections([Vec<NavAreaId>; 2]);
 
 impl<E: Endianness> BitRead<E> for LadderConnections {
     fn read(stream: &mut BitReadStream<E>) -> Result<Self, ReadError> {
@@ -112,13 +170,14 @@ impl<E: Endianness> BitRead<E> for LadderConnections {
 }
 
 impl Index<LadderDirection> for LadderConnections {
-    type Output = Vec<u32>;
+    type Output = Vec<NavAreaId>;
 
     fn index(&self, index: LadderDirection) -> &Self::Output {
         &self.0[index as u8 as usize]
     }
 }
 
+/// The directions in which two areas can be connected
 #[derive(Debug, BitRead)]
 #[repr(u8)]
 #[discriminant_bits = 8]
@@ -129,6 +188,7 @@ pub enum NavDirection {
     West,
 }
 
+/// The directions in which two areas can be connected by ladder
 #[derive(Debug, BitRead)]
 #[repr(u8)]
 #[discriminant_bits = 8]
@@ -137,6 +197,7 @@ pub enum LadderDirection {
     Down,
 }
 
+/// A hiding spot within an area
 #[derive(Debug, BitRead)]
 pub struct NavHidingSpot {
     id: u32,
@@ -144,6 +205,7 @@ pub struct NavHidingSpot {
     flags: u8,
 }
 
+/// An area that can be used for approach, no longer used in newer nav files
 #[derive(Debug, BitRead)]
 pub struct ApproachArea {
     approach_here: u32,
@@ -153,11 +215,12 @@ pub struct ApproachArea {
     approach_how: u8,
 }
 
+/// A path that can be used to approach an area
 #[derive(Debug, BitRead)]
 pub struct EncounterPath {
-    from_area_id: u32,
+    from_area_id: NavAreaId,
     from_direction: u8,
-    to_area_id: u32,
+    to_area_id: NavAreaId,
     to_direction: u8,
     #[size_bits = 8]
     spots: Vec<EncounterSpot>,
@@ -169,6 +232,7 @@ pub struct EncounterSpot {
     distance: u8, // divide by 255
 }
 
+/// The light intensity at the four corners of an area
 #[derive(Debug, BitRead, Default)]
 pub struct LightIntensity {
     pub north_west: f32,
@@ -177,6 +241,7 @@ pub struct LightIntensity {
     pub south_east: f32,
 }
 
+/// An area that is visible
 #[derive(Debug, BitRead)]
 pub struct VisibleArea {
     id: u32,

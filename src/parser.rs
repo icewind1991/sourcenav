@@ -2,20 +2,24 @@ pub use crate::navmesh::NavArea;
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use err_derive::Error;
 
+/// Errors that can occur when parsing the binary nav file
 #[derive(Debug, Error)]
 pub enum ParseError {
+    /// An error ocured when reading from the source binary data
     #[error(display = "Error while reading from data: {}", _0)]
     ReadError(#[error(source)] bitbuffer::ReadError),
     #[error(
         display = "Invalid magic number ({:#8X}), not a nav file or corrupted",
         _0
     )]
+    /// The binary data contained an invalid magic number and is probably not a nav file
     InvalidMagicNumber(u32),
+    /// The version of the nav file is not supported by this parser
     #[error(display = "The major version for this nav ({}), is not supported", _0)]
     UnsupportedVersion(u32),
 }
 
-pub fn read_areas(data: Vec<u8>) -> Result<Vec<NavArea>, ParseError> {
+pub(crate) fn read_areas(data: Vec<u8>) -> Result<Vec<NavArea>, ParseError> {
     let mut data = BitReadStream::new(BitReadBuffer::new(data, LittleEndian));
     let magic = data.read()?;
     if magic != 0xFEEDFACE {

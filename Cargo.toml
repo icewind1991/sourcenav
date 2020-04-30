@@ -11,3 +11,6 @@ bitbuffer = "0.7.1"
 err-derive = "0.2.4"
 aabb-quadtree = "0.2.0"
 euclid = "0.19"
+
+[dev-dependencies]
+doc-comment = "0.3.3"

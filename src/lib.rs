@@ -1,4 +1,8 @@
 use crate::navmesh::HammerUnit;
+pub use crate::navmesh::{
+    ApproachArea, Connections, EncounterPath, LadderConnections, LadderDirection, LightIntensity,
+    NavDirection, NavHidingSpot, Vector3, VisibleArea,
+};
 use crate::parser::read_areas;
 pub use crate::parser::{NavArea, ParseError};
 use aabb_quadtree::{ItemId, QuadTree};
@@ -7,8 +11,22 @@ use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
 mod navmesh;
 mod parser;
 
+/// A tree of all navigation areas
 pub struct NavTree(QuadTree<NavArea, HammerUnit, [(ItemId, TypedRect<f32, HammerUnit>); 4]>);
 
+/// Parse all navigation areas from a nav file
+///
+/// ## Examples
+///
+/// ```no_run
+/// use sourcenav::get_area_tree;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let file = std::fs::read("path/to/navfile.nav")?;
+/// let tree = get_area_tree(file)?;
+/// # Ok(())
+/// # }
+/// ```
 pub fn get_area_tree(data: Vec<u8>) -> Result<NavTree, ParseError> {
     let areas = read_areas(data)?;
 
@@ -40,19 +58,60 @@ pub fn get_area_tree(data: Vec<u8>) -> Result<NavTree, ParseError> {
 }
 
 impl NavTree {
-    pub fn query(
-        &self,
-        x: f32,
-        y: f32,
-    ) -> impl Iterator<Item = (&NavArea, TypedRect<f32, HammerUnit>, ItemId)> {
+    /// Find the navigation areas at a x/y cooordinate
+    ///
+    /// ## Examples
+    ///
+    /// ```no_run
+    /// use sourcenav::get_area_tree;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let file = std::fs::read("path/to/navfile.nav")?;
+    /// let tree = get_area_tree(file)?;
+    /// let areas = tree.query(150.0, -312.0);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn query(&self, x: f32, y: f32) -> impl Iterator<Item = &NavArea> {
         let query_box = TypedRect::new(TypedPoint2D::new(x, y), TypedSize2D::new(1.0, 1.0));
 
-        self.0.query(query_box).into_iter()
+        self.0.query(query_box).into_iter().map(|(area, ..)| area)
     }
 
+    /// Find the z-height of a specfic x/y cooordinate
+    ///
+    /// Note that multiple heights might exist for a given x/y coooridnate
+    ///
+    /// ## Examples
+    ///
+    /// ```no_run
+    /// use sourcenav::get_area_tree;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let file = std::fs::read("path/to/navfile.nav")?;
+    /// let tree = get_area_tree(file)?;
+    /// let heights = tree.find_z_height(150.0, -312.0);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn find_z_height<'a>(&'a self, x: f32, y: f32) -> impl Iterator<Item = f32> + 'a {
-        self.query(x, y)
-            .map(move |(area, ..)| area.get_z_height(x, y))
+        self.query(x, y).map(move |area| area.get_z_height(x, y))
+    }
+
+    /// Get the z height at a point
+    ///
+    /// A z-guess should be provided to resolve cases where multiple z values are possible
+    pub fn find_best_height(&self, x: f32, y: f32, z_guess: f32) -> f32 {
+        let found_heights = self.find_z_height(x, y);
+        let best_z = f32::MIN;
+
+        found_heights.fold(best_z, |best_z, found_z| {
+            if (found_z - z_guess).abs() < (best_z - z_guess).abs() {
+                found_z
+            } else {
+                best_z
+            }
+        })
     }
 }
 
@@ -94,11 +153,10 @@ fn test_tree() {
     );
 
     assert_eq!(
-        tree.query(point3.0, point3.1)
-            .next()
-            .map(|(area, ..)| area.id),
-        tree.query(point4.0, point4.1)
-            .next()
-            .map(|(area, ..)| area.id)
+        tree.query(point3.0, point3.1).next().map(|area| area.id),
+        tree.query(point4.0, point4.1).next().map(|area| area.id)
     );
 }
+
+#[cfg(doctest)]
+doc_comment::doctest!("../README.md");
