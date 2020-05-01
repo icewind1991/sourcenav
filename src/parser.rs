@@ -22,7 +22,7 @@ pub enum ParseError {
 pub(crate) fn read_areas(data: Vec<u8>) -> Result<Vec<NavArea>, ParseError> {
     let mut data = BitReadStream::new(BitReadBuffer::new(data, LittleEndian));
     let magic = data.read()?;
-    if magic != 0xFEEDFACE {
+    if magic != 0xFEED_FACE {
         return Err(ParseError::InvalidMagicNumber(magic));
     }
 

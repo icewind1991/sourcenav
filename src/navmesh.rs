@@ -1,6 +1,7 @@
+use crate::Rect;
 use aabb_quadtree::Spatial;
 use bitbuffer::{BitRead, BitReadStream, Endianness, ReadError};
-use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
+use euclid::{TypedPoint2D, TypedSize2D};
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Index;
@@ -84,8 +85,8 @@ impl NavArea {
 pub(crate) struct HammerUnit;
 
 impl Spatial<HammerUnit> for NavArea {
-    fn aabb(&self) -> TypedRect<f32, HammerUnit> {
-        TypedRect {
+    fn aabb(&self) -> Rect {
+        Rect {
             origin: TypedPoint2D::new(self.north_west.0, self.north_west.1),
             size: TypedSize2D::new(
                 self.south_east.0 - self.north_west.0,
@@ -120,11 +121,11 @@ impl<E: Endianness> BitRead<E> for Connections {
     fn read(stream: &mut BitReadStream<E>) -> Result<Self, ReadError> {
         let mut connections = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
-        for direction in 0..4 {
+        for direction in connections.iter_mut() {
             let connection_count: u32 = stream.read()?;
-            connections[direction] = Vec::with_capacity(connection_count as usize);
+            direction.reserve(connection_count as usize);
             for _ in 0..connection_count {
-                connections[direction].push(stream.read()?);
+                direction.push(stream.read()?);
             }
         }
 
@@ -165,11 +166,11 @@ impl<E: Endianness> BitRead<E> for LadderConnections {
     fn read(stream: &mut BitReadStream<E>) -> Result<Self, ReadError> {
         let mut connections = [Vec::new(), Vec::new()];
 
-        for direction in 0..2 {
+        for direction in connections.iter_mut() {
             let connection_count: u32 = stream.read()?;
-            connections[direction] = Vec::with_capacity(connection_count as usize);
+            direction.reserve(connection_count as usize);
             for _ in 0..connection_count {
-                connections[direction].push(stream.read()?);
+                direction.push(stream.read()?);
             }
         }
 

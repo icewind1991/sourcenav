@@ -11,8 +11,10 @@ use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
 mod navmesh;
 mod parser;
 
+type Rect = TypedRect<f32, HammerUnit>;
+
 /// A tree of all navigation areas
-pub struct NavTree(QuadTree<NavArea, HammerUnit, [(ItemId, TypedRect<f32, HammerUnit>); 4]>);
+pub struct NavTree(QuadTree<NavArea, HammerUnit, [(ItemId, Rect); 4]>);
 
 /// Parse all navigation areas from a nav file
 ///
@@ -43,7 +45,7 @@ pub fn get_area_tree(data: Vec<u8>) -> Result<NavTree, ParseError> {
     );
 
     let mut tree = QuadTree::default(
-        TypedRect::new(
+        Rect::new(
             TypedPoint2D::new(min_x - 1.0, min_y - 1.0),
             TypedSize2D::new(max_x - min_x + 2.0, max_y - min_y + 2.0),
         ),
@@ -73,7 +75,7 @@ impl NavTree {
     /// # }
     /// ```
     pub fn query(&self, x: f32, y: f32) -> impl Iterator<Item = &NavArea> {
-        let query_box = TypedRect::new(TypedPoint2D::new(x, y), TypedSize2D::new(1.0, 1.0));
+        let query_box = Rect::new(TypedPoint2D::new(x, y), TypedSize2D::new(1.0, 1.0));
 
         self.0.query(query_box).into_iter().map(|(area, ..)| area)
     }
