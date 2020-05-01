@@ -113,6 +113,26 @@ impl NavTree {
             }
         })
     }
+
+    /// Get all navigation areas from the nav file
+    ///
+    /// ## Examples
+    ///
+    /// ```no_run
+    /// use sourcenav::get_area_tree;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let file = std::fs::read("path/to/navfile.nav")?;
+    /// let tree = get_area_tree(file)?;
+    /// for area in tree.areas() {
+    ///     println!("area: {}", area.id)
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn areas(&self) -> impl Iterator<Item = &NavArea> {
+        self.0.iter().map(|(_, (area, _))| area)
+    }
 }
 
 #[test]

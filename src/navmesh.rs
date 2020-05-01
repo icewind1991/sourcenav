@@ -1,6 +1,8 @@
 use aabb_quadtree::Spatial;
 use bitbuffer::{BitRead, BitReadStream, Endianness, ReadError};
 use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
+use std::fmt;
+use std::fmt::Debug;
 use std::ops::Index;
 
 /// A 3 dimensional coordinate
@@ -10,6 +12,12 @@ pub struct Vector3(pub f32, pub f32, pub f32);
 /// A unique identifier for a navigation area
 #[derive(Debug, BitRead, Clone, Copy, Eq, PartialEq)]
 pub struct NavAreaId(u32);
+
+impl fmt::Display for NavAreaId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// A navigation area from the nav file
 #[derive(Debug)]
