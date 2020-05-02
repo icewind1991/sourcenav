@@ -1,5 +1,5 @@
 pub use crate::navmesh::NavArea;
-use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
+use bitbuffer::{BitReadStream, LittleEndian};
 use err_derive::Error;
 
 /// Errors that can occur when parsing the binary nav file
@@ -19,8 +19,9 @@ pub enum ParseError {
     UnsupportedVersion(u32),
 }
 
-pub(crate) fn read_areas(data: Vec<u8>) -> Result<Vec<NavArea>, ParseError> {
-    let mut data = BitReadStream::new(BitReadBuffer::new(data, LittleEndian));
+pub(crate) fn read_areas(
+    mut data: BitReadStream<LittleEndian>,
+) -> Result<Vec<NavArea>, ParseError> {
     let magic = data.read()?;
     if magic != 0xFEED_FACE {
         return Err(ParseError::InvalidMagicNumber(magic));
@@ -146,6 +147,7 @@ pub(crate) fn read_areas(data: Vec<u8>) -> Result<Vec<NavArea>, ParseError> {
 #[test]
 fn test() {
     let file = std::fs::read("data/pl_badwater.nav").unwrap();
-    let areas = read_areas(file).unwrap();
+    let data = BitReadStream::new(bitbuffer::BitReadBuffer::new(file, LittleEndian));
+    let areas = read_areas(data).unwrap();
     assert_eq!(1930, areas.len());
 }

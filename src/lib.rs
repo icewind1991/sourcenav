@@ -6,6 +6,7 @@ pub use crate::navmesh::{
 use crate::parser::read_areas;
 pub use crate::parser::{NavArea, ParseError};
 use aabb_quadtree::{ItemId, QuadTree};
+use bitbuffer::{BitReadStream, LittleEndian};
 use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
 
 mod navmesh;
@@ -29,8 +30,8 @@ pub struct NavTree(QuadTree<NavArea, HammerUnit, [(ItemId, Rect); 4]>);
 /// # Ok(())
 /// # }
 /// ```
-pub fn get_area_tree(data: Vec<u8>) -> Result<NavTree, ParseError> {
-    let areas = read_areas(data)?;
+pub fn get_area_tree(data: impl Into<BitReadStream<LittleEndian>>) -> Result<NavTree, ParseError> {
+    let areas = read_areas(data.into())?;
 
     let (min_x, min_y, max_x, max_y) = areas.iter().fold(
         (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
