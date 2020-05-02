@@ -24,10 +24,7 @@ impl fmt::Display for NavAreaId {
 #[derive(Debug)]
 pub struct NavArea {
     pub id: NavAreaId,
-    pub north_west: Vector3,
-    pub south_east: Vector3,
-    pub north_east_z: f32,
-    pub south_west_z: f32,
+    pub quad: NavQuad,
     pub flags: u32,
     pub connections: Connections,
     pub hiding_spots: Vec<NavHidingSpot>,
@@ -42,59 +39,7 @@ pub struct NavArea {
     pub inherit_visibility_from_area_id: u32,
 }
 
-impl NavArea {
-    pub fn width(&self) -> f32 {
-        self.south_east.0 - self.north_west.0
-    }
-    pub fn height(&self) -> f32 {
-        self.south_east.1 - self.north_west.1
-    }
-
-    /// Get the z height of a x/y point inside the navigation area
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use sourcenav::get_area_tree;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///   let file = std::fs::read("path/to/navfile.nav")?;
-    ///   let tree = get_area_tree(file)?;
-    ///   let area = tree.query(150.0, -312.0).next().unwrap();
-    ///   
-    ///   let height = area.get_z_height(150.0, -312.0);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn get_z_height(&self, x: f32, y: f32) -> f32 {
-        let from_east = self.south_east.0 - x;
-        let from_south = self.south_east.0 - y;
-
-        let north_slope = (self.north_west.2 - self.north_east_z) / self.width();
-        let south_slope = (self.south_west_z - self.south_east.2) / self.width();
-
-        let north_z = self.north_east_z + north_slope * from_east;
-        let south_z = self.south_east.2 + south_slope * from_east;
-
-        let final_slope = (north_z - south_z) / self.height();
-
-        south_z + final_slope * from_south
-    }
-}
-
 pub(crate) struct HammerUnit;
-
-impl Spatial<HammerUnit> for NavArea {
-    fn aabb(&self) -> Rect {
-        Rect {
-            origin: TypedPoint2D::new(self.north_west.0, self.north_west.1),
-            size: TypedSize2D::new(
-                self.south_east.0 - self.north_west.0,
-                self.south_east.1 - self.north_west.1,
-            ),
-        }
-    }
-}
 
 /// The connections from a navigation area into it's neighbours
 ///
@@ -130,6 +75,14 @@ impl<E: Endianness> BitRead<E> for Connections {
         }
 
         Ok(Connections(connections))
+    }
+
+    fn skip(stream: &mut BitReadStream<E>) -> Result<(), ReadError> {
+        for _ in 0..4 {
+            let connection_count: u32 = stream.read()?;
+            stream.skip_bits(connection_count as usize * 32)?;
+        }
+        Ok(())
     }
 }
 
@@ -175,6 +128,14 @@ impl<E: Endianness> BitRead<E> for LadderConnections {
         }
 
         Ok(LadderConnections(connections))
+    }
+
+    fn skip(stream: &mut BitReadStream<E>) -> Result<(), ReadError> {
+        for _ in 0..2 {
+            let connection_count: u32 = stream.read()?;
+            stream.skip_bits(connection_count as usize * 32)?;
+        }
+        Ok(())
     }
 }
 
@@ -263,5 +224,63 @@ pub struct NavPlace {
     name: String,
 }
 
+/// A navigation area from the nav file
 #[derive(Debug)]
-pub struct NavMesh {}
+pub struct NavQuad {
+    pub north_west: Vector3,
+    pub south_east: Vector3,
+    pub north_east_z: f32,
+    pub south_west_z: f32,
+}
+
+impl NavQuad {
+    pub fn width(&self) -> f32 {
+        self.south_east.0 - self.north_west.0
+    }
+    pub fn height(&self) -> f32 {
+        self.south_east.1 - self.north_west.1
+    }
+
+    /// Get the z height of a x/y point inside the navigation area
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use sourcenav::get_quad_tree;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///   let file = std::fs::read("path/to/navfile.nav")?;
+    ///   let tree = get_quad_tree(file)?;
+    ///   let area = tree.query(150.0, -312.0).next().unwrap();
+    ///   
+    ///   let height = area.get_z_height(150.0, -312.0);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_z_height(&self, x: f32, y: f32) -> f32 {
+        let from_east = self.south_east.0 - x;
+        let from_south = self.south_east.0 - y;
+
+        let north_slope = (self.north_west.2 - self.north_east_z) / self.width();
+        let south_slope = (self.south_west_z - self.south_east.2) / self.width();
+
+        let north_z = self.north_east_z + north_slope * from_east;
+        let south_z = self.south_east.2 + south_slope * from_east;
+
+        let final_slope = (north_z - south_z) / self.height();
+
+        south_z + final_slope * from_south
+    }
+}
+
+impl Spatial<HammerUnit> for NavQuad {
+    fn aabb(&self) -> Rect {
+        Rect {
+            origin: TypedPoint2D::new(self.north_west.0, self.north_west.1),
+            size: TypedSize2D::new(
+                self.south_east.0 - self.north_west.0,
+                self.south_east.1 - self.north_west.1,
+            ),
+        }
+    }
+}

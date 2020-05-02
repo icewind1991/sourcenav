@@ -1,10 +1,10 @@
 use crate::navmesh::HammerUnit;
 pub use crate::navmesh::{
     ApproachArea, Connections, EncounterPath, LadderConnections, LadderDirection, LightIntensity,
-    NavDirection, NavHidingSpot, Vector3, VisibleArea,
+    NavDirection, NavHidingSpot, NavQuad, Vector3, VisibleArea,
 };
-use crate::parser::read_areas;
-pub use crate::parser::{NavArea, ParseError};
+use crate::parser::read_quads;
+pub use crate::parser::{read_areas, NavArea, ParseError};
 use aabb_quadtree::{ItemId, QuadTree};
 use bitbuffer::{BitReadStream, LittleEndian};
 use euclid::{TypedPoint2D, TypedRect, TypedSize2D};
@@ -15,23 +15,25 @@ mod parser;
 type Rect = TypedRect<f32, HammerUnit>;
 
 /// A tree of all navigation areas
-pub struct NavTree(QuadTree<NavArea, HammerUnit, [(ItemId, Rect); 4]>);
+pub struct NavQuadTree(QuadTree<NavQuad, HammerUnit, [(ItemId, Rect); 4]>);
 
-/// Parse all navigation areas from a nav file
+/// Parse all navigation quads from a nav file
 ///
 /// ## Examples
 ///
 /// ```no_run
-/// use sourcenav::get_area_tree;
+/// use sourcenav::get_quad_tree;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let file = std::fs::read("path/to/navfile.nav")?;
-/// let tree = get_area_tree(file)?;
+/// let tree = get_quad_tree(file)?;
 /// # Ok(())
 /// # }
 /// ```
-pub fn get_area_tree(data: impl Into<BitReadStream<LittleEndian>>) -> Result<NavTree, ParseError> {
-    let areas = read_areas(data.into())?;
+pub fn get_quad_tree(
+    data: impl Into<BitReadStream<LittleEndian>>,
+) -> Result<NavQuadTree, ParseError> {
+    let areas = read_quads(data.into())?;
 
     let (min_x, min_y, max_x, max_y) = areas.iter().fold(
         (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
@@ -57,25 +59,25 @@ pub fn get_area_tree(data: impl Into<BitReadStream<LittleEndian>>) -> Result<Nav
         tree.insert(area);
     }
 
-    Ok(NavTree(tree))
+    Ok(NavQuadTree(tree))
 }
 
-impl NavTree {
+impl NavQuadTree {
     /// Find the navigation areas at a x/y cooordinate
     ///
     /// ## Examples
     ///
     /// ```no_run
-    /// use sourcenav::get_area_tree;
+    /// use sourcenav::get_quad_tree;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let file = std::fs::read("path/to/navfile.nav")?;
-    /// let tree = get_area_tree(file)?;
+    /// let tree = get_quad_tree(file)?;
     /// let areas = tree.query(150.0, -312.0);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn query(&self, x: f32, y: f32) -> impl Iterator<Item = &NavArea> {
+    pub fn query(&self, x: f32, y: f32) -> impl Iterator<Item = &NavQuad> {
         let query_box = Rect::new(TypedPoint2D::new(x, y), TypedSize2D::new(1.0, 1.0));
 
         self.0.query(query_box).into_iter().map(|(area, ..)| area)
@@ -88,11 +90,11 @@ impl NavTree {
     /// ## Examples
     ///
     /// ```no_run
-    /// use sourcenav::get_area_tree;
+    /// use sourcenav::get_quad_tree;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let file = std::fs::read("path/to/navfile.nav")?;
-    /// let tree = get_area_tree(file)?;
+    /// let tree = get_quad_tree(file)?;
     /// let heights = tree.find_z_height(150.0, -312.0);
     /// # Ok(())
     /// # }
@@ -122,18 +124,18 @@ impl NavTree {
     /// ## Examples
     ///
     /// ```no_run
-    /// use sourcenav::get_area_tree;
+    /// use sourcenav::get_quad_tree;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let file = std::fs::read("path/to/navfile.nav")?;
-    /// let tree = get_area_tree(file)?;
-    /// for area in tree.areas() {
-    ///     println!("area: {}", area.id)
+    /// let tree = get_quad_tree(file)?;
+    /// for quad in tree.quads() {
+    ///     println!("area: {:?}", quad)
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub fn areas(&self) -> impl Iterator<Item = &NavArea> {
+    pub fn quads(&self) -> impl Iterator<Item = &NavQuad> {
         self.0.iter().map(|(_, (area, _))| area)
     }
 }
@@ -141,7 +143,7 @@ impl NavTree {
 #[test]
 fn test_tree() {
     let file = std::fs::read("data/pl_badwater.nav").unwrap();
-    let tree = get_area_tree(file).unwrap();
+    let tree = get_quad_tree(file).unwrap();
 
     // single flat plane
     let point1 = (1600.0, -1300.0);
@@ -173,11 +175,6 @@ fn test_tree() {
     assert_eq!(
         vec![147.23126],
         tree.find_z_height(point4.0, point4.1).collect::<Vec<f32>>()
-    );
-
-    assert_eq!(
-        tree.query(point3.0, point3.1).next().map(|area| area.id),
-        tree.query(point4.0, point4.1).next().map(|area| area.id)
     );
 }
 
