@@ -1,3 +1,5 @@
+# Moved to https://codeberg.org/icewind/sourcenav
+
 # SourceNav
 
 parsing of SourceEngine `.nav` files
